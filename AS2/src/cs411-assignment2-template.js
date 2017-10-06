@@ -22,6 +22,7 @@ var u_FragColor;
 var a_Position;
 var vertices;
 var n;
+var scale = 1;
 
 var speed = 0.1;
 var angSpeed = 1;
@@ -70,15 +71,31 @@ function speedDown() {
 }
 
 function zoomIn() {
-//////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////// YOUR CODE HERE //////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////
+    scale *= 1.25;
+    // select the view window (projection camera)
+    var left = -boardW / 2.0, right = boardW / 2.0, bottom = -boardH / 2.0, top = boardH / 2.0, near = 0, far = 10;
+    pMatrix.setIdentity();
+    pMatrix.ortho(left / scale, right / scale, bottom / scale, top / scale, near, far);
+    mvMatrix.multiply(pMatrix);
+
+    var v1 = (gl.viewportWidth * (scale - 1)) / 2;
+
+    gl.viewport(-v1,-v1, gl.viewportWidth * scale, gl.viewportHeight * scale);
+
 }
 
 function zoomOut() {
-//////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////// YOUR CODE HERE //////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////
+    scale /= 1.25;
+    // select the view window (projection camera)
+    var left = -boardW / 2.0, right = boardW / 2.0, bottom = -boardH / 2.0, top = boardH / 2.0, near = 0, far = 10;
+    pMatrix.setIdentity();
+    pMatrix.ortho(left * scale, right * scale, bottom * scale, top * scale, near, far);
+    mvMatrix.multiply(pMatrix);
+
+    var v1 = (gl.viewportWidth * (scale - 1)) / 2;
+
+    gl.viewport(-v1,-v1, gl.viewportWidth * scale, gl.viewportHeight * scale);
+
 }
 
 function toggleRenderMode() {
@@ -129,7 +146,6 @@ function initScene(gl) {
     pMatrix.setIdentity();
     pMatrix.ortho(left, right, bottom, top, near, far);
     mvMatrix.multiply(pMatrix);
-    mvMatrix.scale(2, 2, 1);
 
     // set the camera position and orientation (viewing transformation)
     var eyeX = 0, eyeY = 0, eyeZ = 10;
@@ -202,6 +218,8 @@ function drawScene(gl, u_ModelMatrix, u_FragColor, n) {
     } else
         mvMatrix.rotate(curRotAngle, 0, 0, 1);
 
+    mvMatrix.scale(scale, scale, 1);
+
     // BIND vertexBuffer
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
     gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
@@ -242,23 +260,23 @@ function animate() {
     curPosX += speed * dX;
     curPosY += speed * dY;
 
-    if (curPosX < -boardW / 2.0) { // left intersection
-        curPosX = -boardW / 2.0;
+    if (curPosX < -(boardW / scale) / 2.0) { // left intersection
+        curPosX = -(boardW / scale) / 2.0;
         dX *= -1;
     }
 
-    if (curPosX > boardW / 2.0) { // right intersection
-        curPosX = boardW / 2.0;
+    if (curPosX > (boardW / scale) / 2.0) { // right intersection
+        curPosX = (boardW / scale) / 2.0;
         dX *= -1;
     }
 
-    if (curPosY < -boardH / 2.0) { // bottom intersection
-        curPosY = -boardH / 2.0;
+    if (curPosY < -(boardH / scale) / 2.0) { // bottom intersection
+        curPosY = -(boardH / scale) / 2.0;
         dY *= -1;
     }
 
-    if (curPosY > boardH / 2.0) { // top intersection
-        curPosY = boardH / 2.0;
+    if (curPosY > (boardH / scale) / 2.0) { // top intersection
+        curPosY = (boardH / scale) / 2.0;
         dY *= -1;
     }
 
