@@ -71,14 +71,12 @@ function zoomIn() {
 //////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////// YOUR CODE HERE //////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////
-    mvMatrix.setScale(2, 2, 1);
 }
 
 function zoomOut() {
 //////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////// YOUR CODE HERE //////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////
-    mvMatrix.setScale(1, 1, 1);
 }
 
 function toggleRenderMode() {
@@ -94,20 +92,17 @@ function togglePause() {
 
 var vertexBuffer;
 var lineBuffer;
+var pointBuffer;
 
 function initVertexBuffers(gl) {
-//////////////////////////////////////////////////////////////////////////////////
-////////////////////////// DO NOT CHANGE THIS OBJECT /////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////
 
-    var n = 3; // The number of vertices
-
+    vertexBuffer = gl.createBuffer();
+    lineBuffer = gl.createBuffer();
+    pointBuffer = gl.createBuffer();
 
     var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
     gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(a_Position);
-
-    return n;
 }
 
 function initScene(gl, u_ModelMatrix, u_FragColor, n) {
@@ -138,16 +133,13 @@ function drawScene(gl, u_ModelMatrix, u_FragColor, n) {
     // Clear canvas
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
-
+    mvMatrix.setIdentity();
 
     var vertices = new Float32Array(
         [0, 0.3,
             -0.3, -0.3,
             0.3, -0.3,
             0.0, -0.1]); // CM
-    // Create a buffer object
-    vertexBuffer = gl.createBuffer();
-    lineBuffer = gl.createBuffer();
 
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
@@ -156,30 +148,33 @@ function drawScene(gl, u_ModelMatrix, u_FragColor, n) {
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(past), gl.DYNAMIC_DRAW); // copy the vertices
 
 
-    mvMatrix.setIdentity();
+    if (renderMode > 0) {
+        // Bind the buffer object to target
+        gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
+        var len = past.length / 2;
+        gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
+        gl.uniformMatrix4fv(u_ModelMatrix, false, mvMatrix.elements);
+        gl.uniform4f(u_FragColor, 1, 1, 0, 1);
+
+        gl.drawArrays(gl.LINE_STRIP, 0, len);
+    }
 
     mvPushMatrix();
     mvMatrix.translate(curPosX, curPosY, 0);
     mvMatrix.rotate(curRotAngle, 0, 0, 1);
 
-
     // Bind the buffer object to target
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
     gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
+
     gl.uniformMatrix4fv(u_ModelMatrix, false, mvMatrix.elements);
+
+    gl.uniform4f(u_FragColor, 1,0,0,1);
     gl.drawArrays(gl.TRIANGLES, 0, 3);   // draw the triangle
+    gl.uniform4f(u_FragColor, 1,1,1,1);
+    gl.drawArrays(gl.POINTS, 3, 1);      // draw the CM
 
     mvPopMatrix();
-
-
-    // Bind the buffer object to target
-    gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
-    var len = past.length / 2;
-    gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
-    gl.uniformMatrix4fv(u_ModelMatrix, false, mvMatrix.elements);
-    gl.uniform4f(u_FragColor, 1, 1, 0, 1);
-
-    gl.drawArrays(gl.LINE_STRIP, 0, len);
 
 }
 
