@@ -87,12 +87,10 @@ function zoomIn() {
 function zoomOut() {
     scale /= 1.25;
 
-
     var left = -boardW / 2.0, right = boardW / 2.0, bottom = -boardH / 2.0, top = boardH / 2.0, near = 0, far = 10;
     pMatrix.setIdentity();
     pMatrix.ortho(left * scale, right * scale, bottom * scale, top * scale, near, far);
     mvMatrix.multiply(pMatrix);
-
     var v1 = (gl.viewportWidth * (scale - 1)) / 2;
     gl.viewport(-v1, -v1, gl.viewportWidth * scale, gl.viewportHeight * scale);
 }
