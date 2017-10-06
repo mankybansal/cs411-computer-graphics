@@ -27,8 +27,8 @@ var speed = 0.1;
 var angSpeed = 1;
 var renderMode = 0;
 var pauseFlag = 0;
-var boardW = 10.0;          // board width
-var boardH = 10.0;          // board height
+var boardW = 2.0;          // board width
+var boardH = 2.0;          // board height
 var curPosX = 0, curPosY = 0;  // current position of object
 var curRotAngle = 0;      // current rotation of object
 var dX, dY;                // correct direction of motion (unit vector)
@@ -71,12 +71,14 @@ function zoomIn() {
 //////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////// YOUR CODE HERE //////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////
+    mvMatrix.setScale(2, 2, 1);
 }
 
 function zoomOut() {
 //////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////// YOUR CODE HERE //////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////
+    mvMatrix.setScale(1, 1, 1);
 }
 
 function toggleRenderMode() {
@@ -90,38 +92,19 @@ function togglePause() {
     console.log('pauseFlag = %d', pauseFlag);
 }
 
+var vertexBuffer;
+var lineBuffer;
+
 function initVertexBuffers(gl) {
 //////////////////////////////////////////////////////////////////////////////////
 ////////////////////////// DO NOT CHANGE THIS OBJECT /////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////
-    var vertices = new Float32Array(
-        [0, 0.3,
-            -0.3, -0.3,
-            0.3, -0.3,
-            0.0, -0.1]); // CM
+
     var n = 3; // The number of vertices
 
-    // Create a buffer object
-    var vertexBuffer = gl.createBuffer();
-    if (!vertexBuffer) {
-        console.log('Failed to create the buffer object');
-        return false;
-    }
-
-    // Bind the buffer object to target
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-    // Write data into the buffer object
-    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
     var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
-    if (a_Position < 0) {
-        console.log('Failed to get the storage location of a_Position');
-        return -1;
-    }
-    // Assign the buffer object to a_Position variable
     gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
-
-    // Enable the assignment to a_Position variable
     gl.enableVertexAttribArray(a_Position);
 
     return n;
@@ -139,6 +122,7 @@ function initScene(gl, u_ModelMatrix, u_FragColor, n) {
     pMatrix.setIdentity();
     pMatrix.ortho(left, right, bottom, top, near, far);
     mvMatrix.multiply(pMatrix);
+    mvMatrix.scale(2, 2, 1);
     //mvPushMatrix();
 
     // set the camera position and orientation (viewing transformation)
@@ -149,42 +133,54 @@ function initScene(gl, u_ModelMatrix, u_FragColor, n) {
     //mvPushMatrix();
 }
 
-
 function drawScene(gl, u_ModelMatrix, u_FragColor, n) {
 
-    // clear canvas
+    // Clear canvas
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
 
+    var vertices = new Float32Array(
+        [0, 0.3,
+            -0.3, -0.3,
+            0.3, -0.3,
+            0.0, -0.1]); // CM
+    // Create a buffer object
+    vertexBuffer = gl.createBuffer();
+    lineBuffer = gl.createBuffer();
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(past), gl.DYNAMIC_DRAW); // copy the vertices
+
+
+    mvMatrix.setIdentity();
+
     mvPushMatrix();
+    mvMatrix.translate(curPosX, curPosY, 0);
+    mvMatrix.rotate(curRotAngle, 0, 0, 1);
 
 
-//////////////////////////////////////////////////////////////////////////////////
-////////////////////////// TRANSFORM THE OBJECT //////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////
-
-    // draw the object
+    // Bind the buffer object to target
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
     gl.uniformMatrix4fv(u_ModelMatrix, false, mvMatrix.elements);
-    gl.uniform4f(u_FragColor, 1, 0, 0, 1);
     gl.drawArrays(gl.TRIANGLES, 0, 3);   // draw the triangle
-    gl.uniform4f(u_FragColor, 1, 1, 1, 1);
-    gl.drawArrays(gl.POINTS, 3, 1);      // draw the CM
-
 
     mvPopMatrix();
 
+
+    // Bind the buffer object to target
+    gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
+    var len = past.length / 2;
+    gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
     gl.uniformMatrix4fv(u_ModelMatrix, false, mvMatrix.elements);
+    gl.uniform4f(u_FragColor, 1, 1, 0, 1);
 
+    gl.drawArrays(gl.LINE_STRIP, 0, len);
 
-    // draw the path as lines
-    if (renderMode > 0) {
-        gl.uniform4f(u_FragColor, 1, 1, 0, 1);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(past), gl.DYNAMIC_DRAW); // copy the vertices
-
-        var len = past.length / 2;
-        gl.drawArrays(gl.LINE_STRIP, 0, len);
-    }
 }
 
 function animate() {
@@ -224,13 +220,8 @@ function animate() {
         dY *= -1;
     }
 
-    console.log("Past X,Y = ", past[past.length - 2], ", ", past[past.length - 1]);
-
     past.push(curPosX);
     past.push(curPosY);
-
-    console.log("Current X,Y = ", curPosX, ", ", curPosY);
-
 }
 
 function tick() {
