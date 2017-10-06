@@ -80,22 +80,21 @@ function zoomIn() {
 
     var v1 = (gl.viewportWidth * (scale - 1)) / 2;
 
-    gl.viewport(-v1,-v1, gl.viewportWidth * scale, gl.viewportHeight * scale);
+    gl.viewport(-v1, -v1, gl.viewportWidth * scale, gl.viewportHeight * scale);
 
 }
 
 function zoomOut() {
     scale /= 1.25;
-    // select the view window (projection camera)
+
+
     var left = -boardW / 2.0, right = boardW / 2.0, bottom = -boardH / 2.0, top = boardH / 2.0, near = 0, far = 10;
     pMatrix.setIdentity();
     pMatrix.ortho(left * scale, right * scale, bottom * scale, top * scale, near, far);
     mvMatrix.multiply(pMatrix);
 
     var v1 = (gl.viewportWidth * (scale - 1)) / 2;
-
-    gl.viewport(-v1,-v1, gl.viewportWidth * scale, gl.viewportHeight * scale);
-
+    gl.viewport(-v1, -v1, gl.viewportWidth * scale, gl.viewportHeight * scale);
 }
 
 function toggleRenderMode() {
@@ -237,7 +236,6 @@ function drawScene(gl, u_ModelMatrix, u_FragColor, n) {
     mvPopMatrix();
 
 }
-
 
 function threeDto3DH(V) {
     return new Vector4([V.elements[0], V.elements[1], 0, 1]);
