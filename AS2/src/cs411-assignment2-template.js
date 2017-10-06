@@ -35,6 +35,8 @@ var curRotAngle = 0;      // current rotation of object
 var dX, dY;                // correct direction of motion (unit vector)
 var past = [];
 
+var vertexBuffer, lineBuffer; // buffers
+
 // Vertex shader program
 var VSHADER_SOURCE =
     'attribute vec4 a_Position;\n' +
@@ -51,7 +53,6 @@ var FSHADER_SOURCE =
     'void main() {\n' +
     '  gl_FragColor = u_FragColor;\n' +
     '}\n';
-
 
 // button event handlers
 function speedUp() {
@@ -86,7 +87,6 @@ function toggleRenderMode() {
     console.log('renderMode = %d', renderMode);
 }
 
-
 function toggleRotateMode() {
     rotateMode++;
     if (rotateMode > 1) rotateMode = 0;
@@ -98,12 +98,9 @@ function togglePause() {
     console.log('pauseFlag = %d', pauseFlag);
 }
 
-var vertexBuffer;
-var lineBuffer;
-var pointBuffer;
-
 function initVertexBuffers(gl) {
 
+    // CREATE TRIANGLE
     vertices = new Float32Array([
         0, 0.3,
         -0.3, -0.3,
@@ -111,16 +108,16 @@ function initVertexBuffers(gl) {
         0.0, -0.1
     ]); // CM
 
+    // CREATE LINE & VERTEX BUFFER
     vertexBuffer = gl.createBuffer();
     lineBuffer = gl.createBuffer();
-    pointBuffer = gl.createBuffer();
 
     var a_Position = gl.getAttribLocation(gl.program, 'a_Position');
     gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(a_Position);
 }
 
-function initScene(gl, u_ModelMatrix, u_FragColor, n) {
+function initScene(gl) {
     // select the viewport
     gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
 
@@ -133,49 +130,51 @@ function initScene(gl, u_ModelMatrix, u_FragColor, n) {
     pMatrix.ortho(left, right, bottom, top, near, far);
     mvMatrix.multiply(pMatrix);
     mvMatrix.scale(2, 2, 1);
-    //mvPushMatrix();
 
     // set the camera position and orientation (viewing transformation)
     var eyeX = 0, eyeY = 0, eyeZ = 10;
     var centerX = 0, centerY = 0, centerZ = 0;
     var upX = 0, upY = 1, upZ = 0;
     mvMatrix.lookAt(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
-    //mvPushMatrix();
 }
 
 function drawScene(gl, u_ModelMatrix, u_FragColor, n) {
 
-    // Clear canvas
+    // CLEAR CANVAS
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     mvMatrix.setIdentity();
 
+    // BIND lineBuffer
+    gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(past), gl.DYNAMIC_DRAW);
 
+    // BIND vertexBuffer
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(past), gl.DYNAMIC_DRAW); // copy the vertices
-
-
+    // CHECK RENDER MODE TO DRAW LINES
     if (renderMode > 0) {
-        // Bind the buffer object to target
+        // BIND lineBuffer
         gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
         var len = past.length / 2;
         gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
-        gl.uniformMatrix4fv(u_ModelMatrix, false, mvMatrix.elements);
-        gl.uniform4f(u_FragColor, 1, 1, 0, 1);
 
-        gl.drawArrays(gl.LINE_STRIP, 0, len);
+        // DRAW LINES
+        gl.uniformMatrix4fv(u_ModelMatrix, false, mvMatrix.elements);
+        gl.uniform4f(u_FragColor, 1, 1, 0, 1); // set color
+        gl.drawArrays(gl.LINE_STRIP, 0, len); // draw line
     }
 
     mvPushMatrix();
     mvMatrix.translate(curPosX, curPosY, 0);
 
     if (rotateMode > 0) {
+
         ///////////////////////////////////////////
         /// DEFINE ROTATION MATRIX FOR DIRECTION
         ///////////////////////////////////////////
+
         var xDiff = past[past.length - 2] - past[past.length - 4];
         var yDiff = past[past.length - 1] - past[past.length - 3];
 
@@ -200,21 +199,22 @@ function drawScene(gl, u_ModelMatrix, u_FragColor, n) {
 
         mvMatrix.multiply(M);
         mvMatrix.rotate(-90, 0, 0, 1);
-    } else {
+    } else
         mvMatrix.rotate(curRotAngle, 0, 0, 1);
-    }
 
-
-    // Bind the buffer object to target
+    // BIND vertexBuffer
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
     gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
 
     gl.uniformMatrix4fv(u_ModelMatrix, false, mvMatrix.elements);
 
-    gl.uniform4f(u_FragColor, 1, 0, 0, 1);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);   // draw the triangle
-    gl.uniform4f(u_FragColor, 1, 1, 1, 1);
-    gl.drawArrays(gl.POINTS, 3, 1);      // draw the CM
+    // DRAW TRIANGLE
+    gl.uniform4f(u_FragColor, 1, 0, 0, 1); // set color
+    gl.drawArrays(gl.TRIANGLES, 0, 3); // draw triangle
+
+    // DRAW CENTER OF MASS
+    gl.uniform4f(u_FragColor, 1, 1, 1, 1); // set color
+    gl.drawArrays(gl.POINTS, 3, 1); // draw point
 
     mvPopMatrix();
 
@@ -224,18 +224,6 @@ function drawScene(gl, u_ModelMatrix, u_FragColor, n) {
 function threeDto3DH(V) {
     return new Vector4([V.elements[0], V.elements[1], 0, 1]);
 }
-
-function threeDHto3D(V) {
-    var w;
-    if ((w = V.elements[3]) !== 0) {
-        return [
-            V.elements[0] / w,
-            V.elements[1] / w,
-            0
-        ];
-    } else return false;
-}
-
 
 function animate() {
     // Calculate the elapsed time
@@ -277,13 +265,12 @@ function animate() {
     past.push(curPosX);
     past.push(curPosY);
 
-
 }
 
 function tick() {
-    if (!pauseFlag) animate();                                   // update position and rotation angle
-    drawScene(gl, u_ModelMatrix, u_FragColor, n);   // draw the object
-    requestAnimationFrame(tick, canvas);         // request a new animation frame
+    if (!pauseFlag) animate(); // update position and rotation angle
+    drawScene(gl, u_ModelMatrix, u_FragColor, n); // draw the object
+    requestAnimationFrame(tick, canvas); // request a new animation frame
 }
 
 
@@ -293,44 +280,25 @@ function main() {
 
     // Get the rendering context for WebGL
     gl = getWebGLContext(canvas);
-    if (!gl) {
-        console.log('Failed to get the rendering context for WebGL');
-        return;
-    }
 
     // get canvas height/width
     gl.viewportWidth = canvas.width;
     gl.viewportHeight = canvas.height;
-    console.log(gl.viewportWidth);
-    console.log(gl.viewportHeight);
 
-    // Initialize shaders
+    // INIT SHADERS
     if (!initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE)) {
         console.log('Failed to intialize shaders.');
         return;
     }
 
-    // Write the positions of vertices to a vertex shader
-    n = initVertexBuffers(gl);
-    if (n < 0) {
-        console.log('Failed to set the positions of the vertices');
-        return;
-    }
+    // INIT BUFFERS
+    initVertexBuffers(gl);
 
     // get pointers to shader uniform variables
     u_ModelMatrix = gl.getUniformLocation(gl.program, 'u_ModelMatrix');
-    if (!u_ModelMatrix) {
-        console.log('Failed to get the storage location of u_ModelMatrix');
-        return;
-    }
-
     u_FragColor = gl.getUniformLocation(gl.program, 'u_FragColor');
-    if (!u_FragColor) {
-        console.log('Failed to get the storage location of u_FragColor');
-        return;
-    }
 
-    // set button listeners
+    // SET BUTTON LISTENERS
     var speedUpBtn = document.getElementById('speedUpButton');
     speedUpBtn.addEventListener('click', speedUp);
 
@@ -352,14 +320,13 @@ function main() {
     var rotateModeBtn = document.getElementById('rotateModeButton');
     rotateModeBtn.addEventListener('click', toggleRotateMode);
 
-    // set path angle
+    // SET PATH ANGLE
     var pathBaseAngle = 30;
     dX = Math.cos(Math.PI * pathBaseAngle / 180.0);
     dY = Math.sin(Math.PI * pathBaseAngle / 180.0);
 
-    // draw
-    initScene(gl, u_ModelMatrix, u_FragColor, n);
-    //  drawScene(gl,u_ModelMatrix,u_FragColor,n);
+    // DRAW
+    initScene(gl);
     tick();
 }
 
