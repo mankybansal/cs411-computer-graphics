@@ -72,46 +72,12 @@ function speedDown() {
 
 function zoomIn() {
     scale *= 1.25;
-    console.log(scale);
-    // select the view window (projection camera)
-    var left = -boardW / 2.0, right = boardW / 2.0, bottom = -boardH / 2.0, top = boardH / 2.0, near = 0, far = 10;
-    pMatrix.setIdentity();
-    pMatrix.ortho(left / scale, right / scale, bottom / scale, top / scale, near, far);
-    mvMatrix.multiply(pMatrix);
-    if(scale>=1) {
-        var v1 = (gl.viewportWidth * (scale - 1)) / 2;
-        console.log("V1 " + v1);
-        gl.viewport(-v1, -v1, gl.viewportWidth * scale, gl.viewportHeight * scale);
-
-        console.log(gl.viewportWidth*scale);
-    }
-    else{
-        //mvMatrix.scale(scale,scale,1);
-        var v1 = (gl.viewportWidth * (scale - 1)) / 2;
-    }
-
+    console.log("Scale: " + scale);
 }
 
 function zoomOut() {
     scale /= 1.25;
-    console.log(scale);
-    var left = -boardW / 2.0, right = boardW / 2.0, bottom = -boardH / 2.0, top = boardH / 2.0, near = 0, far = 10;
-    pMatrix.setIdentity();
-    pMatrix.ortho(left * scale, right * scale, bottom * scale, top * scale, near, far);
-    if(scale>1) {
-        mvMatrix.multiply(pMatrix);
-        var v1 = (gl.viewportWidth * (scale - 1)) / 2;
-        console.log("V1 " + v1);
-        gl.viewport(-v1, -v1, gl.viewportWidth * scale, gl.viewportHeight * scale);
-
-        console.log(gl.viewportWidth * scale);
-    }
-    else{
-        //mvMatrix.scale(scale,scale,1);
-        var v1 = (gl.viewportWidth * (scale - 1)) / 2;
-        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
-    }
-    console.log(gl.viewportWidth);
+    console.log("Scale: " + scale);
 }
 
 function toggleRenderMode() {
@@ -293,7 +259,6 @@ function animate() {
         curPosY = (boardH / scale) / 2.0;
         dY *= -1;
     }
-    console.log((boardW/scale)/2);
     past.push(curPosX);
     past.push(curPosY);
 
