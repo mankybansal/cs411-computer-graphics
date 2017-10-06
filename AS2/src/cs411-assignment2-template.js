@@ -27,6 +27,7 @@ var speed = 0.1;
 var angSpeed = 1;
 var renderMode = 0;
 var pauseFlag = 0;
+var rotateMode = 0;
 var boardW = 2.0;          // board width
 var boardH = 2.0;          // board height
 var curPosX = 0, curPosY = 0;  // current position of object
@@ -85,6 +86,13 @@ function toggleRenderMode() {
     console.log('renderMode = %d', renderMode);
 }
 
+
+function toggleRotateMode() {
+    rotateMode++;
+    if (rotateMode > 1) rotateMode = 0;
+    console.log('rotateMode = %d', rotateMode);
+}
+
 function togglePause() {
     pauseFlag = 1 - pauseFlag;
     console.log('pauseFlag = %d', pauseFlag);
@@ -95,6 +103,13 @@ var lineBuffer;
 var pointBuffer;
 
 function initVertexBuffers(gl) {
+
+    vertices = new Float32Array([
+        0, 0.3,
+        -0.3, -0.3,
+        0.3, -0.3,
+        0.0, -0.1
+    ]); // CM
 
     vertexBuffer = gl.createBuffer();
     lineBuffer = gl.createBuffer();
@@ -135,11 +150,6 @@ function drawScene(gl, u_ModelMatrix, u_FragColor, n) {
     gl.clear(gl.COLOR_BUFFER_BIT);
     mvMatrix.setIdentity();
 
-    var vertices = new Float32Array(
-        [0, 0.3,
-            -0.3, -0.3,
-            0.3, -0.3,
-            0.0, -0.1]); // CM
 
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
@@ -161,7 +171,39 @@ function drawScene(gl, u_ModelMatrix, u_FragColor, n) {
 
     mvPushMatrix();
     mvMatrix.translate(curPosX, curPosY, 0);
-    mvMatrix.rotate(curRotAngle, 0, 0, 1);
+
+    if (rotateMode > 0) {
+        ///////////////////////////////////////////
+        /// DEFINE ROTATION MATRIX FOR DIRECTION
+        ///////////////////////////////////////////
+        var xDiff = past[past.length - 2] - past[past.length - 4];
+        var yDiff = past[past.length - 1] - past[past.length - 3];
+
+        var xDiffNorm = xDiff / (Math.sqrt(Math.pow(xDiff, 2) + Math.pow(yDiff, 2)));
+        var yDiffNorm = yDiff / (Math.sqrt(Math.pow(xDiff, 2) + Math.pow(yDiff, 2)));
+
+        var V = new Vector4([xDiffNorm, yDiffNorm, 0]);
+        var V3DH = threeDto3DH(V);
+        var M = new Matrix4();
+        M.setRotate(90, 0, 0, 1);
+        V3DH = M.multiplyVector4(V3DH);
+
+        var xFormMatrix = new Float32Array([
+            V.elements[0], V.elements[1], 0, 0,
+            V3DH.elements[0], V3DH.elements[1], 0, 0,
+            0, 0, 1, 0,
+            0, 0, 0, 1
+        ]);
+
+        M = new Matrix4();
+        M.elements = xFormMatrix;
+
+        mvMatrix.multiply(M);
+        mvMatrix.rotate(-90, 0, 0, 1);
+    } else {
+        mvMatrix.rotate(curRotAngle, 0, 0, 1);
+    }
+
 
     // Bind the buffer object to target
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
@@ -169,14 +211,31 @@ function drawScene(gl, u_ModelMatrix, u_FragColor, n) {
 
     gl.uniformMatrix4fv(u_ModelMatrix, false, mvMatrix.elements);
 
-    gl.uniform4f(u_FragColor, 1,0,0,1);
+    gl.uniform4f(u_FragColor, 1, 0, 0, 1);
     gl.drawArrays(gl.TRIANGLES, 0, 3);   // draw the triangle
-    gl.uniform4f(u_FragColor, 1,1,1,1);
+    gl.uniform4f(u_FragColor, 1, 1, 1, 1);
     gl.drawArrays(gl.POINTS, 3, 1);      // draw the CM
 
     mvPopMatrix();
 
 }
+
+
+function threeDto3DH(V) {
+    return new Vector4([V.elements[0], V.elements[1], 0, 1]);
+}
+
+function threeDHto3D(V) {
+    var w;
+    if ((w = V.elements[3]) !== 0) {
+        return [
+            V.elements[0] / w,
+            V.elements[1] / w,
+            0
+        ];
+    } else return false;
+}
+
 
 function animate() {
     // Calculate the elapsed time
@@ -217,6 +276,8 @@ function animate() {
 
     past.push(curPosX);
     past.push(curPosY);
+
+
 }
 
 function tick() {
@@ -287,6 +348,9 @@ function main() {
 
     var pauseBtn = document.getElementById('pauseButton');
     pauseBtn.addEventListener('click', togglePause);
+
+    var rotateModeBtn = document.getElementById('rotateModeButton');
+    rotateModeBtn.addEventListener('click', toggleRotateMode);
 
     // set path angle
     var pathBaseAngle = 30;
