@@ -199,8 +199,6 @@ function drawScene(gl, u_ModelMatrix, u_FragColor, n) {
     } else
         mvMatrix.rotate(curRotAngle, 0, 0, 1);
 
-    //mvMatrix.scale(scale, scale, 1);
-
     // BIND vertexBuffer
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
     gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
@@ -216,7 +214,6 @@ function drawScene(gl, u_ModelMatrix, u_FragColor, n) {
     gl.drawArrays(gl.POINTS, 3, 1); // draw point
 
     mvPopMatrix();
-
 }
 
 function threeDto3DH(V) {
@@ -259,6 +256,7 @@ function animate() {
         curPosY = (boardH / scale) / 2.0;
         dY *= -1;
     }
+
     past.push(curPosX);
     past.push(curPosY);
 

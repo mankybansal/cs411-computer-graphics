@@ -8,5 +8,6 @@
 This repo contains the coursework and assignments for IIT's CS411 - Computer Graphics. 
 
 ### Assignments:
-* Assignment 0
-* Assignment 1
+* Assignment 0 - Linear Algebra Refresher
+* Assignment 1 - Raster Graphics
+* Assignment 2 - 2D Modelling and Viewing
