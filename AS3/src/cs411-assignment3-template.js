@@ -3,7 +3,7 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 //
-// CS411 Assignment 2 (Fall 2017) - 2d modelling and viewing
+// CS411 Assignment 3 (Fall 2017) - Curve and Surface Interpolation
 //
 // Mayank Bansal
 // A20392482
@@ -42,7 +42,6 @@ var intrPts = [];
 var Mc = new Matrix4();
 
 
-
 // vertex shader program
 var VSHADER_SOURCE =
     'attribute vec4 a_Position;\n' +
@@ -60,6 +59,16 @@ var FSHADER_SOURCE =
     '  gl_FragColor = u_FragColor;\n' +
     '}\n';
 
+// update Mc Matrix function
+function updateMc() {
+    Mc.elements = new Float32Array([
+        -tension, 2 - tension, tension - 2, tension,
+        2 * tension, tension - 3, 3 - 2 * tension, -tension,
+        -tension, 0, tension, 0,
+        0, 1, 0, 0
+    ]);
+
+}
 
 // button event handlers
 function speedUp() {
@@ -79,11 +88,16 @@ function speedDown() {
 function tensionUp() {
     tension += 0.1;
     console.log('tension = %f', tension);
+    updateMc();
+    processPoints();
+
 }
 
 function tensionDown() {
     tension -= 0.1;
     console.log('tension = %f', tension);
+    updateMc();
+    processPoints();
 }
 
 function toggleRenderMode() {
@@ -98,11 +112,12 @@ function togglePause() {
 }
 
 function initVertexBuffers(gl) {
-    vertices = new Float32Array(
-        [0, 0.30,
-            -0.3, -0.15,
-            0.3, -0.15,
-            0.0, 0.0]); // CM
+    vertices = new Float32Array([
+        0, 0.30,
+        -0.3, -0.15,
+        0.3, -0.15,
+        0.0, 0.0
+    ]); // CM
     var n = 3; // The number of vertices
 
     // create a buffer object
@@ -192,7 +207,6 @@ function drawScene(gl, u_ModelMatrix, u_FragColor, n) {
     gl.uniform4f(u_FragColor, 1, 0, 1, 1); // set color
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(ctrlPts), gl.DYNAMIC_DRAW); // copy the vertices
     gl.drawArrays(gl.POINTS, 0, ctrlPts.length / 2);
-
 }
 
 function animate() {
@@ -251,13 +265,10 @@ function tick() {
 }
 
 
-function interpolate(pk_n1, pk, pk_p1, pk_p2) {
+function interpolate(pk_n1, pk_p0, pk_p1, pk_p2) {
 
-    var xCoords = [pk_n1.x, pk.x, pk_p1.x, pk_p2.x];
-    var yCoords = [pk_n1.y, pk.y, pk_p1.y, pk_p2.y];
-
-    console.log("xCoords:", xCoords);
-    console.log("yCoords:", yCoords);
+    var xCoords = [pk_n1.x, pk_p0.x, pk_p1.x, pk_p2.x];
+    var yCoords = [pk_n1.y, pk_p0.y, pk_p1.y, pk_p2.y];
 
     var xCoordsMc = [
         Mc.elements[0] * xCoords[0] + Mc.elements[1] * xCoords[1] + Mc.elements[2] * xCoords[2] + Mc.elements[3] * xCoords[3],
@@ -273,35 +284,18 @@ function interpolate(pk_n1, pk, pk_p1, pk_p2) {
         Mc.elements[12] * yCoords[0] + Mc.elements[13] * yCoords[1] + Mc.elements[14] * yCoords[2] + Mc.elements[15] * yCoords[3],
     ];
 
-    console.log("xCoordsMc:", xCoordsMc);
-    console.log("yCoordsMc:", yCoordsMc);
-
     for (var u = 0; u <= 1; u += uStep) {
 
         var Ux = [Math.pow(u, 3), u * u, u, 1];
         var Uy = [Math.pow(u, 3), u * u, u, 1];
 
         var xNewCoords = xCoordsMc[0] * Ux[0] + xCoordsMc[1] * Ux[1] + xCoordsMc[2] * Ux[2] + xCoordsMc[3] * Ux[3];
-
         var yNewCoords = yCoordsMc[0] * Uy[0] + yCoordsMc[1] * Uy[1] + yCoordsMc[2] * Uy[2] + yCoordsMc[3] * Uy[3];
-
-        console.log("xNewCoords, yNewCoords: ", xNewCoords, yNewCoords);
-
-        // var xTest = Ux.multiply(xCoords);
-        // var yTest = Uy.multiply(yCoords);
-        //
-        // console.log(xTest);
-        // console.log(yTest);
-
-
-        var x = pk.x + u * (pk_p1.x - pk.x);
-        var y = pk.y + u * (pk_p1.y - pk.y);
 
         intrPts.push(xNewCoords);
         intrPts.push(yNewCoords);
     }
 }
-
 
 function click(ev, gl, canvas, a_Position) {
     // get display coordinates
@@ -314,36 +308,42 @@ function click(ev, gl, canvas, a_Position) {
     y = (canvas.height / 2 - (y - rect.top)) / (canvas.height / 2) * boardH / 2;
 
     // store the point
-    console.log('storing point (%f,%f)', x, y);
+    console.log('Storing point (%f,%f)', x, y);
     ctrlPts.push(x);
     ctrlPts.push(y);
+
+    // process new points
+    processPoints();
+}
+
+function processPoints() {
+
+    intrPts = [];
+    console.log("Redrawing...");
 
     // generate interpolation points
     var nCtrlPts = ctrlPts.length / 2;
     if (nCtrlPts > 3) {
-        // there are 4 points - interpolate between pk and pk+1
-        console.log('adding interpolation points');
-        var pk_n1 = {x: ctrlPts[nCtrlPts * 2 - 8], y: ctrlPts[nCtrlPts * 2 - 7]}; // p_{k-1}
-        var pk = {x: ctrlPts[nCtrlPts * 2 - 6], y: ctrlPts[nCtrlPts * 2 - 5]}; // p_{k}
-        var pk_p1 = {x: ctrlPts[nCtrlPts * 2 - 4], y: ctrlPts[nCtrlPts * 2 - 3]}; // p_{k+1}
-        var pk_p2 = {x: ctrlPts[nCtrlPts * 2 - 2], y: ctrlPts[nCtrlPts * 2 - 1]}; // p_{k+2}
-        interpolate(pk_n1, pk, pk_p1, pk_p2);
+        for (var i = 0; i < nCtrlPts - 3; i++) {
+            // there are 4 points - interpolate between pk and pk+1
+            console.log('adding interpolation points');
+            var pk_n1 = {x: ctrlPts[0 + i * 2], y: ctrlPts[1 + i * 2]}; // p_{k-1}
+            var pk_p0 = {x: ctrlPts[2 + i * 2], y: ctrlPts[3 + i * 2]}; // p_{k+0}
+            var pk_p1 = {x: ctrlPts[4 + i * 2], y: ctrlPts[5 + i * 2]}; // p_{k+1}
+            var pk_p2 = {x: ctrlPts[6 + i * 2], y: ctrlPts[7 + i * 2]}; // p_{k+2}
+            interpolate(pk_n1, pk_p0, pk_p1, pk_p2);
+        }
     }
 
     // indicate plot update
     refreshFlag = 1;
 }
 
+
 function main() {
 
-
-    Mc.elements = new Float32Array([
-        -tension, 2 - tension, tension - 2, tension,
-        2 * tension, tension - 3, 3 - 2 * tension, -tension,
-        -tension, 0, tension, 0,
-        0, 1, 0, 0
-    ]);
-
+    // update Mc Matrix
+    updateMc();
     console.log("Mc Matrix: ", Mc);
 
     // retrieve the <canvas> element
@@ -388,7 +388,6 @@ function main() {
         return;
     }
 
-
     // set button listeners
     var speedUpBtn = document.getElementById('speedUpButton');
     speedUpBtn.addEventListener('click', speedUp);
@@ -407,7 +406,6 @@ function main() {
 
     var pauseBtn = document.getElementById('pauseButton');
     pauseBtn.addEventListener('click', togglePause);
-
 
     // register an event handler to be called on a mouse click
     canvas.onmousedown = function (ev) {
