@@ -1,6 +1,5 @@
 "use strict";
 
-
 /////////////////////////////////////////////////////////////////////////////////////////
 //
 // CS411 Assignment 3 (Fall 2017) - Curve and Surface Interpolation
@@ -39,7 +38,7 @@ var curRotAngle = 0;
 var uStep = 0.01; // interpolation step
 var ctrlPts = [];
 var intrPts = [];
-var Mc = new Matrix4();
+var Mc;
 
 
 // vertex shader program
@@ -61,13 +60,12 @@ var FSHADER_SOURCE =
 
 // update Mc Matrix function
 function updateMc() {
-    Mc.elements = new Float32Array([
+    Mc = [
         -tension, 2 - tension, tension - 2, tension,
         2 * tension, tension - 3, 3 - 2 * tension, -tension,
         -tension, 0, tension, 0,
         0, 1, 0, 0
-    ]);
-
+    ];
 }
 
 // button event handlers
@@ -90,7 +88,6 @@ function tensionUp() {
     console.log('tension = %f', tension);
     updateMc();
     processPoints();
-
 }
 
 function tensionDown() {
@@ -264,33 +261,34 @@ function tick() {
     requestAnimationFrame(tick, canvas);
 }
 
+function McMultiplyPoints(v) {
+    return [
+        Mc[0] * v[0] + Mc[1] * v[1] + Mc[2] * v[2] + Mc[3] * v[3],
+        Mc[4] * v[0] + Mc[5] * v[1] + Mc[6] * v[2] + Mc[7] * v[3],
+        Mc[8] * v[0] + Mc[9] * v[1] + Mc[10] * v[2] + Mc[11] * v[3],
+        Mc[12] * v[0] + Mc[13] * v[1] + Mc[14] * v[2] + Mc[15] * v[3]
+    ];
+}
+
+function findPoint(v1, v2) {
+    return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2] + v1[3] * v2[3];
+}
 
 function interpolate(pk_n1, pk_p0, pk_p1, pk_p2) {
 
     var xCoords = [pk_n1.x, pk_p0.x, pk_p1.x, pk_p2.x];
     var yCoords = [pk_n1.y, pk_p0.y, pk_p1.y, pk_p2.y];
 
-    var xCoordsMc = [
-        Mc.elements[0] * xCoords[0] + Mc.elements[1] * xCoords[1] + Mc.elements[2] * xCoords[2] + Mc.elements[3] * xCoords[3],
-        Mc.elements[4] * xCoords[0] + Mc.elements[5] * xCoords[1] + Mc.elements[6] * xCoords[2] + Mc.elements[7] * xCoords[3],
-        Mc.elements[8] * xCoords[0] + Mc.elements[9] * xCoords[1] + Mc.elements[10] * xCoords[2] + Mc.elements[11] * xCoords[3],
-        Mc.elements[12] * xCoords[0] + Mc.elements[13] * xCoords[1] + Mc.elements[14] * xCoords[2] + Mc.elements[15] * xCoords[3],
-    ];
-
-    var yCoordsMc = [
-        Mc.elements[0] * yCoords[0] + Mc.elements[1] * yCoords[1] + Mc.elements[2] * yCoords[2] + Mc.elements[3] * yCoords[3],
-        Mc.elements[4] * yCoords[0] + Mc.elements[5] * yCoords[1] + Mc.elements[6] * yCoords[2] + Mc.elements[7] * yCoords[3],
-        Mc.elements[8] * yCoords[0] + Mc.elements[9] * yCoords[1] + Mc.elements[10] * yCoords[2] + Mc.elements[11] * yCoords[3],
-        Mc.elements[12] * yCoords[0] + Mc.elements[13] * yCoords[1] + Mc.elements[14] * yCoords[2] + Mc.elements[15] * yCoords[3],
-    ];
+    var xCoordsMc = McMultiplyPoints(xCoords);
+    var yCoordsMc = McMultiplyPoints(yCoords);
 
     for (var u = 0; u <= 1; u += uStep) {
 
         var Ux = [Math.pow(u, 3), u * u, u, 1];
         var Uy = [Math.pow(u, 3), u * u, u, 1];
 
-        var xNewCoords = xCoordsMc[0] * Ux[0] + xCoordsMc[1] * Ux[1] + xCoordsMc[2] * Ux[2] + xCoordsMc[3] * Ux[3];
-        var yNewCoords = yCoordsMc[0] * Uy[0] + yCoordsMc[1] * Uy[1] + yCoordsMc[2] * Uy[2] + yCoordsMc[3] * Uy[3];
+        var xNewCoords = findPoint(xCoordsMc, Ux);
+        var yNewCoords = findPoint(yCoordsMc, Uy);
 
         intrPts.push(xNewCoords);
         intrPts.push(yNewCoords);
