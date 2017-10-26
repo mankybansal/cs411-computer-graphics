@@ -12,3 +12,4 @@ This repo contains the coursework and assignments for IIT's CS411 - Computer Gra
 * Assignment 1 - Raster Graphics
 * Assignment 2 - 2D Modelling and Viewing
 * Assignment 3 - Curve and Surface Interpolation
+* Assignment 4 - Surface Rendering
