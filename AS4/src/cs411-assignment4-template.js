@@ -22,8 +22,10 @@ var angleStep = 10;                 // increments of rotation angle (degrees)
 var fps = 30;                       // frames per second
 var currentAngle = 0.0;             // current rotation angle [degree]
 
-//var objName = '../data/mycube.obj';
-var objName = '../data/cow.obj';
+var objName = {
+    cow: '../data/cow.obj',
+    cube: '../data/mycube.obj'
+};
 
 var camZ = 1;
 var invertNorm = 0;
@@ -34,6 +36,13 @@ var upRot = new Matrix4();
 var downRot = new Matrix4();
 var tmpRot = new Matrix4();
 
+var cMass = {
+    x: 0,
+    y: 0,
+    z: 0
+};
+
+var loadObject = false;
 
 // vertex shader program
 var VSHADER_SOURCE =
@@ -108,14 +117,17 @@ function zoomOut() {
     camZ = 1;
 }
 
+function toggleObject() {
+    loadObject = !loadObject;
+    initScene();
+}
+
 function invertNormals() {
     invertNorm = !invertNorm;
 
-    for (var i = 0; i < model.arrays.vertices.length; i++) {
-        model.arrays.normals[i * 3 + 0] *= -1;
-        model.arrays.normals[i * 3 + 1] *= -1;
-        model.arrays.normals[i * 3 + 2] *= -1;
-    }
+    for (var i = 0; i < model.arrays.vertices.length; i++)
+        for (var j = 0; j < 3; j++)
+            model.arrays.normals[i * 3 + j] *= -1;
 
     assignVertexBuffersData(gl, buffers, model);
 }
@@ -207,6 +219,14 @@ function printModelInfo(model) {
             model.arrays.indices[i * 3 + 1],
             model.arrays.indices[i * 3 + 2]);
     }
+
+
+    for (var i = 0; i < model.arrays.vertices.length / 3; i++) {
+        cMass.x += model.arrays.vertices[i * 3 + 0];
+        cMass.y += model.arrays.vertices[i * 3 + 1];
+        cMass.z += model.arrays.vertices[i * 3 + 2];
+    }
+
 }
 
 function initScene() {
@@ -229,7 +249,11 @@ function initScene() {
     // start reading the OBJ file
     model = new Object();
     var scale = 60; // 1
-    readOBJFile(objName, gl, model, scale, true); // cube.obj
+
+    if (loadObject)
+        readOBJFile(objName.cube, gl, model, scale, true); // cube.obj
+    else
+        readOBJFile(objName.cow, gl, model, scale, true); // cube.obj
 
     // init rotation matrices
     curRot.setIdentity();
@@ -240,14 +264,102 @@ function initScene() {
 
 }
 
+function calcNormalNew(p0, p1, p2) {
+    // v0: a vector from p1 to p0, v1; a vector from p1 to p2
+    var v0 = new Float32Array(3);
+    var v1 = new Float32Array(3);
+    for (var i = 0; i < 3; i++) {
+        v0[i] = p0[i] - p1[i];
+        v1[i] = p2[i] - p0[i];
+    }
+
+    // The cross product of v0 and v1
+    var c = new Float32Array(3);
+    c[0] = v0[1] * v1[2] - v0[2] * v1[1];
+    c[1] = v0[2] * v1[0] - v0[0] * v1[2];
+    c[2] = v0[0] * v1[1] - v0[1] * v1[0];
+
+    // Normalize the result
+    var v = new Vector3(c);
+    v.normalize();
+    return v.elements;
+}
 
 function drawScene(gl, program, angle, buffers, model) {
     // get model arrays if necessary
     if (!model.arrays) {
         if (isOBJFileLoaded(model)) {
             extractOBJFileArrays(model);
-            assignVertexBuffersData(gl, buffers, model);
+
             printModelInfo(model);
+
+            setTimeout(function () {
+                console.log("Center of Mass: ",
+                    "(" + cMass.x / (model.arrays.vertices.length / 3) + ",",
+                    cMass.y / (model.arrays.vertices.length / 3) + ",",
+                    cMass.z / (model.arrays.vertices.length / 3) + ")"
+                );
+            }, 2000);
+
+            var N, X, R = {value: null, set: false};
+
+            // check vertex windings
+            for (var i = 0; i < model.arrays.vertices.length / 3; i += 3) {
+
+                var v0 = [
+                    model.arrays.vertices[i * 3 + 0],
+                    model.arrays.vertices[i * 3 + 1],
+                    model.arrays.vertices[i * 3 + 2]
+                ];
+
+                var v1 = [
+                    model.arrays.vertices[(i + 1) * 3 + 0],
+                    model.arrays.vertices[(i + 1) * 3 + 1],
+                    model.arrays.vertices[(i + 1) * 3 + 2]
+                ];
+
+                var v2 = [
+                    model.arrays.vertices[(i + 2) * 3 + 0],
+                    model.arrays.vertices[(i + 2) * 3 + 1],
+                    model.arrays.vertices[(i + 2) * 3 + 2]
+                ];
+
+                N = calcNormalNew(v0, v1, v2);
+
+                // test point v0 with normal N for winding order
+                X = v0;
+
+                // calculate X-C
+                X[0] -= cMass.x;
+                X[1] -= cMass.y;
+                X[2] -= cMass.z;
+
+                // calculate winding variable check R = N.(X-C)
+                R.value = N[0] * X[0] + N[1] * X[1] + N[2] * X[2];
+
+                // set R flag if R < 0
+                if (R.value < 0 && !R.set)
+                    R.set = true;
+
+                // print only a few Average Vertex Normals
+                if (i < 36)
+                    console.log("Average Vertex Normal: Face(v" + i + ",v" + (i + 1) + ",v" + (i + 2) + ") ", N);
+
+                // replace vertex normals with average
+                for (var j = 0; j < 3; j++)
+                    for (var k = 0; k < 3; k++)
+                        model.arrays.normals[(i + j) * 3 + k] = N[k];
+            }
+
+            // check if R flag is set to invert normals
+            if (R.set) {
+                for (var i = 0; i < model.arrays.vertices.length; i++)
+                    for (var j = 0; j < 3; j++)
+                        model.arrays.normals[i * 3 + j] *= -1;
+            }
+
+            assignVertexBuffersData(gl, buffers, model);
+
         }
         if (!model.arrays) return;   // drawing failed
     }
@@ -257,10 +369,13 @@ function drawScene(gl, program, angle, buffers, model) {
 
     // perform modeling transformations (rotate)
     mvPushMatrix();
+
+    // We don't want the object ot start rotating
     /* mvMatrix.rotate(angle, 1.0, 0.0, 0.0); // about x
      mvMatrix.rotate(angle, 0.0, 1.0, 0.0); // about y
      mvMatrix.rotate(angle, 0.0, 0.0, 1.0); // about z
- */
+    */
+
     // set the normal matrix
     nMatrix.setInverseOf(mvMatrix);
     nMatrix.transpose();
@@ -276,12 +391,12 @@ function drawScene(gl, program, angle, buffers, model) {
     gl.drawElements(gl.TRIANGLES, model.arrays.indices.length, gl.UNSIGNED_SHORT, 0);
 }
 
-
 function animate(angle) {
     var now = Date.now();
     var elapsed = now - lastAnimationTime;
     if (elapsed < 1000 / fps) return angle;
     lastAnimationTime = now;
+
     // update the current rotation angle (adjusted by elapsed time)
     var newAngle = angle + (angleStep * elapsed) / 1000.0;
     return newAngle % 360;
@@ -348,12 +463,26 @@ function main() {
     var invertNormalsBtn = document.getElementById('invertNormalsBtn');
     invertNormalsBtn.addEventListener('click', invertNormals);
 
+    var toggleObjectBtn = document.getElementById('toggleObjectBtn');
+    toggleObjectBtn.addEventListener('click', toggleObject);
+
     // initialize the scene and start animation
     initScene();
     tick();
+
+    document.onkeydown = checkKey;
+
+    function checkKey(e) {
+        e = e || window.event;
+        if (e.keyCode == '38') turnUp();
+        else if (e.keyCode == '40') turnDown();
+        else if (e.keyCode == '37') turnLeft();
+        else if (e.keyCode == '39') turnRight();
+        else if (e.keyCode == '73') invertNormals();
+        else if (e.keyCode == '79') toggleObject();
+        else if (e.keyCode == '187') zoomIn();
+        else if (e.keyCode == '189') zoomOut();
+    }
 }
-
-
-// EOF
 
 
