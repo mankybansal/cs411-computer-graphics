@@ -42,6 +42,15 @@ var cMass = {
     z: 0
 };
 
+var boundingBox = {
+    xMax: 0,
+    xMin: 0,
+    yMax: 0,
+    yMin: 0,
+    zMax: 0,
+    zMin: 0
+};
+
 var loadObject = false;
 
 // vertex shader program
@@ -132,7 +141,6 @@ function invertNormals() {
     assignVertexBuffersData(gl, buffers, model);
 }
 
-
 // create a buffer object, assign it to attribute variable, and enable the assignment
 function createEmptyArrayBuffer(gl, a_attribute, num, type) {
     var buffer = gl.createBuffer();  // Create a buffer object
@@ -148,11 +156,13 @@ function createEmptyArrayBuffer(gl, a_attribute, num, type) {
 }
 
 function initVertexBuffers(gl, program) {
+
     var o = new Object(); // create new object. Utilize Object object to return multiple buffer objects
     o.vertexBuffer = createEmptyArrayBuffer(gl, program.a_Position, 3, gl.FLOAT);
     o.normalBuffer = createEmptyArrayBuffer(gl, program.a_Normal, 3, gl.FLOAT);
     o.colorBuffer = createEmptyArrayBuffer(gl, program.a_Color, 4, gl.FLOAT);
     o.indexBuffer = gl.createBuffer();
+
     if (!o.vertexBuffer || !o.normalBuffer || !o.colorBuffer || !o.indexBuffer) {
         return null;
     }
@@ -219,14 +229,97 @@ function printModelInfo(model) {
             model.arrays.indices[i * 3 + 1],
             model.arrays.indices[i * 3 + 2]);
     }
+}
 
+function nomalizeObject() {
+    // Calculate Center of Mass of Object
+    cMass = {
+        x: 0,
+        y: 0,
+        z: 0
+    };
+
+    // Calculate Bounding Box
+    boundingBox = {
+        xMax: -9999999,
+        xMin: 99999999,
+        yMax: -9999999,
+        yMin: 99999999,
+        zMax: -9999999,
+        zMin: 99999999
+    };
 
     for (var i = 0; i < model.arrays.vertices.length / 3; i++) {
-        cMass.x += model.arrays.vertices[i * 3 + 0];
-        cMass.y += model.arrays.vertices[i * 3 + 1];
-        cMass.z += model.arrays.vertices[i * 3 + 2];
+        var point = {
+            x: model.arrays.vertices[i * 3 + 0],
+            y: model.arrays.vertices[i * 3 + 1],
+            z: model.arrays.vertices[i * 3 + 2]
+        };
+
+        cMass.x += point.x;
+        cMass.y += point.y;
+        cMass.z += point.z;
+
+        // Find bounding box
+        if (point.x < boundingBox.xMin) boundingBox.xMin = point.x;
+        if (point.x > boundingBox.xMax) boundingBox.xMax = point.x;
+        if (point.y < boundingBox.yMin) boundingBox.yMin = point.y;
+        if (point.y > boundingBox.yMax) boundingBox.yMax = point.y;
+        if (point.z < boundingBox.zMin) boundingBox.zMin = point.z;
+        if (point.z > boundingBox.zMax) boundingBox.zMax = point.z;
     }
 
+    console.log(boundingBox);
+
+    cMass.x /= (model.arrays.vertices.length / 3);
+    cMass.y /= (model.arrays.vertices.length / 3);
+    cMass.z /= (model.arrays.vertices.length / 3);
+
+    // Find largest side of bounding box
+    var initScaleFactor = Math.max(
+        boundingBox.xMax - boundingBox.xMin,
+        boundingBox.yMax - boundingBox.yMin,
+        boundingBox.zMax - boundingBox.zMin
+    );
+
+    mvMatrix.scale(100 / initScaleFactor, 100 / initScaleFactor, 100 / initScaleFactor);
+
+    if (cMass.x !== 0 || cMass.y !== 0 || cMass.z !== 0) {
+        mvMatrix.translate(-cMass.x, -cMass.y, -cMass.z);
+        cMass = {x: 0, y: 0, z: 0};
+    }
+}
+
+function averageNormals() {
+
+    // Reset all the normals
+    for (var i = 0; i < model.arrays.normals.length; i++)
+        model.arrays.normals[i] = 0;
+
+    // Loop through all the faces
+    for (var i = 0; i < model.arrays.indices.length / 3; i++) {
+
+        var p0 = [], p1 = [], p2 = [];
+
+        for (var j = 0; j < 3; j++)  // vertices of face
+            for (var k = 0; k < 3; k++) {  // x,y,z of vertex
+                var point = model.arrays.vertices[3 * model.arrays.indices[3 * i + j] + k];
+                if (j === 0)
+                    p0.push(point);
+                else if (j === 1)
+                    p1.push(point);
+                else
+                    p2.push(point);
+            }
+
+        var newNormal = calcNormal(p0, p1, p2);
+
+        for (var j = 0; j < 3; j++)
+            for (var j = 0; j < 3; j++)
+                model.arrays.normals[3 * model.arrays.indices[3 * i + j] + k] += newNormal[k];
+    }
+
+    console.log('Normals Averaged');
 }
 
 function initScene() {
@@ -264,27 +357,6 @@ function initScene() {
 
 }
 
-function calcNormalNew(p0, p1, p2) {
-    // v0: a vector from p1 to p0, v1; a vector from p1 to p2
-    var v0 = new Float32Array(3);
-    var v1 = new Float32Array(3);
-    for (var i = 0; i < 3; i++) {
-        v0[i] = p0[i] - p1[i];
-        v1[i] = p2[i] - p0[i];
-    }
-
-    // The cross product of v0 and v1
-    var c = new Float32Array(3);
-    c[0] = v0[1] * v1[2] - v0[2] * v1[1];
-    c[1] = v0[2] * v1[0] - v0[0] * v1[2];
-    c[2] = v0[0] * v1[1] - v0[1] * v1[0];
-
-    // Normalize the result
-    var v = new Vector3(c);
-    v.normalize();
-    return v.elements;
-}
-
 function drawScene(gl, program, angle, buffers, model) {
     // get model arrays if necessary
     if (!model.arrays) {
@@ -293,13 +365,16 @@ function drawScene(gl, program, angle, buffers, model) {
 
             printModelInfo(model);
 
+            // print Center of Mass
             setTimeout(function () {
-                console.log("Center of Mass: ",
-                    "(" + cMass.x / (model.arrays.vertices.length / 3) + ",",
-                    cMass.y / (model.arrays.vertices.length / 3) + ",",
-                    cMass.z / (model.arrays.vertices.length / 3) + ")"
-                );
+                console.log("Center of Mass: ", "(" + cMass.x + ",", cMass.y + ",", cMass.z + ")");
             }, 2000);
+
+            nomalizeObject();
+
+            console.log("New Center of Mass: (0, 0, 0)");
+
+            averageNormals();
 
             var N, X, R = {value: null, set: false};
 
@@ -324,7 +399,8 @@ function drawScene(gl, program, angle, buffers, model) {
                     model.arrays.vertices[(i + 2) * 3 + 2]
                 ];
 
-                N = calcNormalNew(v0, v1, v2);
+                // Calculate Average Normal N = (v2-v1)x(v0-v1)
+                N = calcNormal(v0, v1, v2);
 
                 // test point v0 with normal N for winding order
                 X = v0;
@@ -371,9 +447,10 @@ function drawScene(gl, program, angle, buffers, model) {
     mvPushMatrix();
 
     // We don't want the object ot start rotating
-    /* mvMatrix.rotate(angle, 1.0, 0.0, 0.0); // about x
-     mvMatrix.rotate(angle, 0.0, 1.0, 0.0); // about y
-     mvMatrix.rotate(angle, 0.0, 0.0, 1.0); // about z
+    /*
+        mvMatrix.rotate(angle, 1.0, 0.0, 0.0); // about x
+        mvMatrix.rotate(angle, 0.0, 1.0, 0.0); // about y
+        mvMatrix.rotate(angle, 0.0, 0.0, 1.0); // about z
     */
 
     // set the normal matrix
@@ -466,14 +543,9 @@ function main() {
     var toggleObjectBtn = document.getElementById('toggleObjectBtn');
     toggleObjectBtn.addEventListener('click', toggleObject);
 
-    // initialize the scene and start animation
-    initScene();
-    tick();
-
     document.onkeydown = checkKey;
 
     function checkKey(e) {
-        e = e || window.event;
         if (e.keyCode == '38') turnUp();
         else if (e.keyCode == '40') turnDown();
         else if (e.keyCode == '37') turnLeft();
@@ -483,6 +555,10 @@ function main() {
         else if (e.keyCode == '187') zoomIn();
         else if (e.keyCode == '189') zoomOut();
     }
+
+    // initialize the scene and start animation
+    initScene();
+    tick();
 }
 
 
