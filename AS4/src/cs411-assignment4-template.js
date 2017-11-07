@@ -146,7 +146,7 @@ function createEmptyArrayBuffer(gl, a_attribute, num, type) {
     var buffer = gl.createBuffer();  // Create a buffer object
     if (!buffer) {
         console.log('Failed to create the buffer object');
-        return null;
+        return null;D
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.vertexAttribPointer(a_attribute, num, type, false, 0, 0);  // Assign the buffer object to the attribute variable
@@ -314,6 +314,7 @@ function averageNormals() {
 
         var newNormal = calcNormal(p0, p1, p2);
 
+        // Change Normals
         for (var j = 0; j < 3; j++)
             for (var j = 0; j < 3; j++)
                 model.arrays.normals[3 * model.arrays.indices[3 * i + j] + k] += newNormal[k];
