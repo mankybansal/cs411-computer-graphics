@@ -29,6 +29,9 @@ var objName = {
 
 var camZ = 1;
 var invertNorm = 0;
+var bumpMap = true;
+
+var TBNMatrix = [];
 
 var curRot = new Matrix4();
 var leftRot = new Matrix4();
@@ -73,7 +76,6 @@ var FSHADER_SOURCE =
     '  vec3 FinalColor = DiffuseColor.rgb * max(dot(normal, L), 0.0);\n' +
     '  gl_FragColor = v_Color * vec4(FinalColor, DiffuseColor.a);\n' +
     '}\n';
-
 
 // event handlers
 
@@ -132,6 +134,11 @@ function invertNormals() {
     assignVertexBuffersData(gl, buffers, model);
 }
 
+function bumpMapToggle() {
+    bumpMap = !bumpMap;
+
+}
+
 // create a buffer object, assign it to attribute variable, and enable the assignment
 function createEmptyArrayBuffer(gl, a_attribute, num, type) {
     var buffer = gl.createBuffer();  // Create a buffer object
@@ -153,7 +160,7 @@ function initVertexBuffers(gl, program) {
     o.colorBuffer = createEmptyArrayBuffer(gl, program.a_Color, 4, gl.FLOAT);
     o.textureBuffer = createEmptyArrayBuffer(gl, program.a_Texture, 2, gl.FLOAT);
     o.indexBuffer = gl.createBuffer();
-    if (!o.vertexBuffer || !o.normalBuffer || !o.colorBuffer || !o.textureBuffer || !o.indexBuffer) {
+    if (!o.vertexBuffer || !o.normalBuffer || !o.colorBuffer || !o.textureBuffer || !o.indexBuffer || o.tangentBuffer) {
         return null;
     }
 
@@ -178,6 +185,7 @@ function assignVertexBuffersData(gl, buffers, model) {
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.indexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, model.arrays.indices, gl.STATIC_DRAW);
+
 }
 
 function getShaderVariables(program) {
@@ -186,13 +194,15 @@ function getShaderVariables(program) {
     program.a_Normal = gl.getAttribLocation(program, 'a_Normal');
     program.a_Color = gl.getAttribLocation(program, 'a_Color');
     program.a_Texture = gl.getAttribLocation(program, 'a_Texture');
+    program.a_Tangent = gl.getAttribLocation(program, 'a_Tangent');
     program.u_MvpMatrix = gl.getUniformLocation(program, 'u_MvpMatrix');
     program.u_NormalMatrix = gl.getUniformLocation(program, 'u_NormalMatrix');
     program.u_Sampler = gl.getUniformLocation(program, 'u_Sampler');
     program.u_NormalSampler = gl.getUniformLocation(program, 'u_NormalSampler');
 
     if (program.a_Position < 0 || program.a_Normal < 0 || program.a_Color < 0 || program.a_Texture < 0 ||
-        !program.u_MvpMatrix || !program.u_NormalMatrix || !program.u_Sampler || !program.u_NormalSampler) {
+        !program.u_MvpMatrix || !program.u_NormalMatrix || !program.u_Sampler || !program.u_NormalSampler ||
+        !program.a_Tangent) {
         console.log('Error getting attribute/uniform location');
         return false;
     }
@@ -228,8 +238,8 @@ function printModelInfo(model) {
     }
     for (var i = 0; i < 36 && i < model.arrays.vertices.length / 3; i++) {
         console.log("vt[%d]=(%d,%d)", i,
-            model.arrays.textures[i * 3 + 0],
-            model.arrays.textures[i * 3 + 1]);
+            model.arrays.textures[i * 2 + 0],
+            model.arrays.textures[i * 2 + 1]);
     }
     for (var i = 0; i < 10 && i < model.arrays.indices.length / 3; i++) {
         console.log("f[%d]=(%d,%d,%d)", i,
@@ -240,7 +250,7 @@ function printModelInfo(model) {
 }
 
 function isPowerOf2(value) {
-    return (value & (value - 1)) == 0;
+    return (value & (value - 1)) === 0;
 }
 
 // Initialize a texture and load an image.
@@ -288,6 +298,96 @@ function loadTexture(gl, url) {
     return texture;
 }
 
+function findTBN() {
+    for (var i = 0; i < model.arrays.indices.length / 3; i++) {
+
+        var p0 = {
+            x: model.arrays.vertices[3 * model.arrays.indices[3 * i]],
+            y: model.arrays.vertices[3 * model.arrays.indices[3 * i] + 1],
+            z: model.arrays.vertices[3 * model.arrays.indices[3 * i] + 2]
+        };
+
+        var p1 = {
+            x: model.arrays.vertices[3 * model.arrays.indices[3 * i + 1]],
+            y: model.arrays.vertices[3 * model.arrays.indices[3 * i + 1] + 1],
+            z: model.arrays.vertices[3 * model.arrays.indices[3 * i + 1] + 2]
+        };
+
+        var p2 = {
+            x: model.arrays.vertices[3 * model.arrays.indices[3 * i + 2]],
+            y: model.arrays.vertices[3 * model.arrays.indices[3 * i + 2] + 1],
+            z: model.arrays.vertices[3 * model.arrays.indices[3 * i + 2] + 2]
+        };
+
+        var t0 = {
+            x: model.arrays.textures[2 * model.arrays.indices[3 * i]],
+            y: model.arrays.textures[2 * model.arrays.indices[3 * i] + 1]
+        };
+
+        var t1 = {
+            x: model.arrays.textures[2 * model.arrays.indices[3 * i + 1]],
+            y: model.arrays.textures[2 * model.arrays.indices[3 * i + 1] + 1]
+        };
+
+        var t2 = {
+            x: model.arrays.textures[2 * model.arrays.indices[3 * i + 2]],
+            y: model.arrays.textures[2 * model.arrays.indices[3 * i + 2] + 1]
+        };
+
+        var e1 = {
+            x: p1.x - p0.x,
+            y: p1.y - p0.y,
+            z: p1.y - p0.z
+        };
+
+        var e2 = {
+            x: p2.x - p0.x,
+            y: p2.y - p0.y,
+            z: p2.z - p0.z
+        };
+
+        var du1 = t1.x - t0.x;
+        var du2 = t2.x - t0.x;
+        var dv1 = t1.y - t0.y;
+        var dv2 = t2.y - t0.y;
+
+        var det = (du1 * dv2) - (du2 * dv1);
+
+        var tangent = {
+            x: (e1.x * dv2 + e2.x * (-dv1)) / det,
+            y: (e1.y * dv2 + e2.y * (-dv1)) / det,
+            z: (e1.z * dv2 + e2.z * (-dv1)) / det
+        };
+
+        var biTangent = {
+            x: (e1.x * (-du2) + e2.x * du1) / det,
+            y: (e1.y * (-du2) + e2.y * du1) / det,
+            z: (e1.z * (-du2) + e2.z * du1) / det
+        };
+
+        var normals = {
+            x: tangent.y * biTangent.z - tangent.z * biTangent.y,
+            y: -(tangent.x * biTangent.z - tangent.z * biTangent.x),
+            z: tangent.x * biTangent.y - tangent.y * biTangent.x
+        };
+
+        var tangentVector = new Vector3([tangent.x, tangent.y, tangent.z]);
+        tangentVector.normalize();
+
+        var biTangentVector = new Vector3([biTangent.x, biTangent.y, biTangent.z]);
+        biTangentVector.normalize();
+
+        var normalVector = new Vector3([normals.x, normals.y, normals.z]);
+        normalVector.normalize();
+
+        TBNMatrix[i] = [];
+        TBNMatrix[i].push(tangentVector);
+        TBNMatrix[i].push(biTangentVector);
+        TBNMatrix[i].push(normalVector);
+    }
+    console.log("TBN Matrix:", TBNMatrix);
+}
+
 function initScene() {
     // set the clear color and enable the depth test
     gl.clearColor(0.2, 0.2, 0.2, 1.0);
@@ -326,16 +426,22 @@ function drawScene(gl, program, angle, buffers, model) {
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.uniform1i(program.u_Sampler, 0);
 
-    // Specify the texture map
-    gl.activeTexture(gl.TEXTURE1); // use texture unit 1
-    gl.bindTexture(gl.TEXTURE_2D, texture2);
-    gl.uniform1i(program.u_NormalSampler, 1);
+
+    if (bumpMap) {
+        // Specify the texture map
+        gl.activeTexture(gl.TEXTURE1); // use texture unit 1
+        gl.bindTexture(gl.TEXTURE_2D, texture2);
+        gl.uniform1i(program.u_NormalSampler, 1);
+    }
 
     // get model arrays if necessary
     if (!model.arrays) {
         if (isOBJFileLoaded(model)) {
             extractOBJFileArrays(model);
             assignVertexBuffersData(gl, buffers, model);
+
+            findTBN();
+
             printModelInfo(model);
         }
         if (!model.arrays) return;   // drawing failed
@@ -442,6 +548,9 @@ function main() {
 
     var invertNormalsBtn = document.getElementById('invertNormalsBtn');
     invertNormalsBtn.addEventListener('click', invertNormals);
+
+    var bumpMapBtn = document.getElementById('bumpMapBtn');
+    bumpMapBtn.addEventListener('click', bumpMapToggle);
 
     document.onkeydown = checkKey;
 

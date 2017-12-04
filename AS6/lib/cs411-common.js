@@ -9,21 +9,21 @@ Matrix4.prototype.str = function ()
          '  ' + a[1] + ', ' + a[5] + ', ' + a[9] + ', '  + a[13] + '\n' +
          '  ' + a[2] + ', ' + a[6] + ', ' + a[10] + ', ' + a[14] + '\n' + 
          '  ' + a[3] + ', ' + a[7] + ', ' + a[11] + ', ' + a[15] + ']';
-}
+};
 
 
 Vector3.prototype.str = function () 
 {
   var a = this.elements;
   return '['  + a[0] + ', ' + a[1] + ', ' + a[2] + ']';
-}
+};
 
 
 Vector4.prototype.str = function () 
 {
   var a = this.elements;
   return '['  + a[0] + ', ' + a[1] + ', ' + a[2] + ', ' + a[3] + ']';
-}
+};
 
 
 Vector3.prototype.cross = function(v) 
@@ -38,7 +38,7 @@ Vector3.prototype.cross = function(v)
     out.elements[1] = az * bx - ax * bz;
     out.elements[2] = ax * by - ay * bx;
     return out;
-}
+};
 
 
 //
