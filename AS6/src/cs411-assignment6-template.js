@@ -194,15 +194,13 @@ function getShaderVariables(program) {
     program.a_Normal = gl.getAttribLocation(program, 'a_Normal');
     program.a_Color = gl.getAttribLocation(program, 'a_Color');
     program.a_Texture = gl.getAttribLocation(program, 'a_Texture');
-    program.a_Tangent = gl.getAttribLocation(program, 'a_Tangent');
     program.u_MvpMatrix = gl.getUniformLocation(program, 'u_MvpMatrix');
     program.u_NormalMatrix = gl.getUniformLocation(program, 'u_NormalMatrix');
     program.u_Sampler = gl.getUniformLocation(program, 'u_Sampler');
     program.u_NormalSampler = gl.getUniformLocation(program, 'u_NormalSampler');
 
     if (program.a_Position < 0 || program.a_Normal < 0 || program.a_Color < 0 || program.a_Texture < 0 ||
-        !program.u_MvpMatrix || !program.u_NormalMatrix || !program.u_Sampler || !program.u_NormalSampler ||
-        !program.a_Tangent) {
+        !program.u_MvpMatrix || !program.u_NormalMatrix || !program.u_Sampler || !program.u_NormalSampler) {
         console.log('Error getting attribute/uniform location');
         return false;
     }
