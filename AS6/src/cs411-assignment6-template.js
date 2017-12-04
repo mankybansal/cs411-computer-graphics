@@ -16,7 +16,7 @@ var canvas;
 var gl;
 var buffers;                        // vertex buffers
 var model;                          // object model
-var texture;			    // texture map
+var texture, texture2;		    // texture map
 
 var lastAnimationTime = Date.now(); // last time tick() was called
 var angleStep = 10;                 // increments of rotation angle (degrees)
@@ -62,10 +62,16 @@ var FSHADER_SOURCE =
     'precision mediump float;\n' +
     '#endif\n' +
     'uniform sampler2D u_Sampler;\n' +
+    'uniform sampler2D u_NormalSampler;\n' +
     'varying vec4 v_Color;\n' +
     'varying vec2 v_TexCoord;\n' +
     'void main() {\n' +
-    '  gl_FragColor = texture2D(u_Sampler, v_TexCoord)*v_Color;\n' +
+    '  vec4 DiffuseColor = texture2D(u_Sampler, v_TexCoord);\n' +
+    '  vec3 normal = normalize(2.0 * texture2D(u_NormalSampler, v_TexCoord).rgb - 1.0);\n' +
+    '  vec3 LightDir = vec3(-0.35, 0.35, 0.87);\n' +
+    '  vec3 L = normalize(LightDir);\n' +
+    '  vec3 FinalColor = DiffuseColor.rgb * max(dot(normal, L), 0.0);\n' +
+    '  gl_FragColor = v_Color * vec4(FinalColor, DiffuseColor.a);\n' +
     '}\n';
 
 
@@ -183,9 +189,10 @@ function getShaderVariables(program) {
     program.u_MvpMatrix = gl.getUniformLocation(program, 'u_MvpMatrix');
     program.u_NormalMatrix = gl.getUniformLocation(program, 'u_NormalMatrix');
     program.u_Sampler = gl.getUniformLocation(program, 'u_Sampler');
+    program.u_NormalSampler = gl.getUniformLocation(program, 'u_NormalSampler');
 
     if (program.a_Position < 0 || program.a_Normal < 0 || program.a_Color < 0 || program.a_Texture < 0 ||
-        !program.u_MvpMatrix || !program.u_NormalMatrix || !program.u_Sampler) {
+        !program.u_MvpMatrix || !program.u_NormalMatrix || !program.u_Sampler || !program.u_NormalSampler) {
         console.log('Error getting attribute/uniform location');
         return false;
     }
@@ -197,7 +204,7 @@ function printModelInfo(model) {
     console.log("number of vertices=%d", model.arrays.vertices.length / 3);
     console.log("number of normals=%d", model.arrays.normals.length / 3);
     console.log("number of colors=%d", model.arrays.colors.length / 4);
-    console.log("number of texturs=%d", model.arrays.textures.length / 2);
+    console.log("number of textures=%d", model.arrays.textures.length / 2);
     console.log("nummer of faces=%d", model.arrays.indices.length / 3);
 
     for (var i = 0; i < 10 && i < model.arrays.vertices.length / 3; i++) {
@@ -219,7 +226,7 @@ function printModelInfo(model) {
             model.arrays.colors[i * 3 + 2],
             model.arrays.colors[i * 3 + 3]);
     }
-    for (var i = 0; i < 10 && i < model.arrays.vertices.length / 3; i++) {
+    for (var i = 0; i < 36 && i < model.arrays.vertices.length / 3; i++) {
         console.log("vt[%d]=(%d,%d)", i,
             model.arrays.textures[i * 3 + 0],
             model.arrays.textures[i * 3 + 1]);
@@ -319,6 +326,11 @@ function drawScene(gl, program, angle, buffers, model) {
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.uniform1i(program.u_Sampler, 0);
 
+    // Specify the texture map
+    gl.activeTexture(gl.TEXTURE1); // use texture unit 1
+    gl.bindTexture(gl.TEXTURE_2D, texture2);
+    gl.uniform1i(program.u_NormalSampler, 1);
+
     // get model arrays if necessary
     if (!model.arrays) {
         if (isOBJFileLoaded(model)) {
@@ -399,6 +411,7 @@ function main() {
     }
 
     // load texture
+    texture2 = loadTexture(gl, '../data/normal-map.png');
     texture = loadTexture(gl, '../data/frac2.png');
 
     // prepare empty buffer objects
